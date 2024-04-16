@@ -10,19 +10,27 @@ use defmt::*;
 use defmt_rtt as _;
 use embedded_can::nb::Can;
 use embedded_can::{Frame, StandardId};
-use embedded_hal::digital::v2::ToggleableOutputPin;
-use panic_probe as _;
-use rp2040_hal::{entry, pac, Sio, Watchdog};
+use embedded_hal::digital::StatefulOutputPin;
+// use panic_probe as _;
+use panic_halt as _;
 use rp2040_hal::clocks::init_clocks_and_plls;
 use rp2040_hal::gpio::Pins;
+use rp2040_hal::{entry, pac, Sio, Watchdog};
 use rp_pico::XOSC_CRYSTAL_FREQ;
+// const XOSC_CRYSTAL_FREQ: u32 = 12_000_000;
 
 use can2040::global_allocator::init_allocator;
 use can2040::{Can2040, CanFrame};
 
 const CONFIG_CANBUS_FREQUENCY: u32 = 10_000;
-const CONFIG_RP2040_CANBUS_GPIO_RX: u32 = 26;
-const CONFIG_RP2040_CANBUS_GPIO_TX: u32 = 27;
+const CONFIG_RP2040_CANBUS_GPIO_RX: u32 = 8;
+const CONFIG_RP2040_CANBUS_GPIO_TX: u32 = 7;
+
+// Second-stage bootloader ------------------------------------------------------------------------
+#[link_section = ".boot2"]
+#[no_mangle]
+#[used]
+pub static BOOT2_FIRMWARE: [u8; 256] = rp2040_boot2::BOOT_LOADER_GD25Q64CS;
 
 #[entry]
 fn main() -> ! {
@@ -33,7 +41,6 @@ fn main() -> ! {
     let mut watchdog = Watchdog::new(pac.WATCHDOG);
     let sio = Sio::new(pac.SIO);
 
-    // External high-speed crystal on the pico board is 12Mhz
     let _clocks = init_clocks_and_plls(
         XOSC_CRYSTAL_FREQ,
         pac.XOSC,
@@ -48,7 +55,7 @@ fn main() -> ! {
 
     let pins = Pins::new(pac.IO_BANK0, pac.PADS_BANK0, sio.gpio_bank0, &mut pac.RESETS);
 
-    let mut led_pin = pins.gpio25.into_push_pull_output();
+    let mut led_pin = pins.gpio13.into_push_pull_output();
 
     let mut can_bus = can2040::initialize_cbus(
         &mut core,
@@ -80,7 +87,7 @@ fn main() -> ! {
             Err(nb::Error::Other(err)) => {
                 error!("Errors in reading CAN frame, {:?}", err);
             }
-            _ => {} // ignore
+            _ => (), // ignore
         }
     }
 }

@@ -12,6 +12,7 @@ fn main() {
     let header_path = PathBuf::from("c_lib/can2040.h");
     let bindings = bindgen::Builder::default()
         .clang_arg("--target=thumbv6m-none-eabi")
+        .clang_arg("-I/usr/include")
         .header(header_path.to_str().unwrap())
         .derive_debug(true)
         .use_core()
