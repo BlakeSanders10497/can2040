@@ -10,6 +10,7 @@ use defmt::*;
 use defmt_rtt as _;
 use embedded_can::nb::Can;
 use embedded_can::{Frame, StandardId};
+use embedded_hal::digital::InputPin;
 use embedded_hal::digital::StatefulOutputPin;
 // use panic_probe as _;
 use panic_halt as _;
@@ -56,6 +57,7 @@ fn main() -> ! {
     let pins = Pins::new(pac.IO_BANK0, pac.PADS_BANK0, sio.gpio_bank0, &mut pac.RESETS);
 
     let mut led_pin = pins.gpio13.into_push_pull_output();
+    let mut leak_pin = pins.gpio24.into_pull_up_input();
 
     let mut can_bus = can2040::initialize_cbus(
         &mut core,
@@ -65,12 +67,16 @@ fn main() -> ! {
     );
 
     let mut count = 0u64;
-    let mut packet_num = 0u64;
+    // let mut packet_num = 0u64;
     loop {
         count += 1;
+
         if count % 1_000_000 == 13 {
-            packet_num += 1;
-            let f = create_frame(5, packet_num);
+            // packet_num += 1;
+            let leak = leak_pin.is_low().unwrap() as u64;
+            info!("leak: {:?}", leak);
+
+            let f = create_frame(5, leak);
             match <Can2040 as embedded_can::blocking::Can>::transmit(&mut can_bus, &f) {
                 Ok(_) => {}
                 Err(err) => {
@@ -78,7 +84,7 @@ fn main() -> ! {
                 }
             }
             info!("Transmitted package: {:?}", f);
-            led_pin.toggle().expect("TODO: led toggle");
+            led_pin.toggle().unwrap();
         }
         match can_bus.receive() {
             Ok(f) => {
